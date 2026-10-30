@@ -23,10 +23,12 @@ function getHeaders(customRole?: string, customEmail?: string): Record<string, s
   }
 
   const role = customRole || localStorage.getItem('hr_active_role') || 'head_of_hr';
-  const email = customEmail || localStorage.getItem('hr_active_email') || 'head.hr@renaissance.com.bd';
+  const email = customEmail || localStorage.getItem('hr_active_email') || 'syeda.shaila@renaissance.com.bd';
+  const empCode = localStorage.getItem('hr_active_emp_code') || '01-02-0440';
 
   headers['x-demo-role'] = role;
   headers['x-demo-email'] = email;
+  headers['x-demo-employee-code'] = empCode;
 
   return headers;
 }
@@ -138,6 +140,17 @@ export const api = {
     return res.json();
   },
 
+  async deleteTask(id: number): Promise<void> {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete task');
+    }
+  },
+
   async submitTask(id: number, data: { completionNotes: string; attachments?: string }): Promise<Task> {
     const res = await fetch(`/api/tasks/${id}/submit`, {
       method: 'POST',
@@ -160,6 +173,30 @@ export const api = {
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Failed to review task');
+    }
+    return res.json();
+  },
+
+  async pokeTask(id: number): Promise<Task> {
+    const res = await fetch(`/api/tasks/${id}/poke`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to poke task');
+    }
+    return res.json();
+  },
+
+  async unpokeTask(id: number): Promise<Task> {
+    const res = await fetch(`/api/tasks/${id}/unpoke`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to clear poke');
     }
     return res.json();
   },
@@ -255,6 +292,18 @@ export const api = {
     return res.json();
   },
 
+  async deleteKpi(id: number): Promise<any> {
+    const res = await fetch(`/api/kpis/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete KPI');
+    }
+    return res.json();
+  },
+
   // Rankings
   async getRankings(): Promise<{ methodology: any; rankings: PerformanceRankItem[] }> {
     const res = await fetch('/api/performance/ranking', { headers: getHeaders() });
@@ -271,9 +320,13 @@ export const api = {
 
   // Notifications
   async getNotifications(): Promise<NotificationItem[]> {
-    const res = await fetch('/api/notifications', { headers: getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch notifications');
-    return res.json();
+    try {
+      const res = await fetch('/api/notifications', { headers: getHeaders() });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
   },
 
   async markNotificationRead(id: number): Promise<void> {

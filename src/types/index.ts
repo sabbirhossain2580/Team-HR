@@ -102,6 +102,10 @@ export interface Task {
   managerComments?: string | null;
   supportingAttachments?: string | null;
   approvalStatus: 'Not Submitted' | 'Pending Review' | 'Approved' | 'Revision Requested' | 'Rejected';
+  isPoked: boolean;
+  pokedBy?: string | null;
+  pokedAt?: string | null;
+  pokeCount: number;
   createdBy: string;
   lastUpdatedBy?: string | null;
   createdAt?: string;

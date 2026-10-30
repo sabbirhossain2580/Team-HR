@@ -366,6 +366,10 @@ app.get('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
         managerComments: tasks.managerComments,
         supportingAttachments: tasks.supportingAttachments,
         approvalStatus: tasks.approvalStatus,
+        isPoked: tasks.isPoked,
+        pokedBy: tasks.pokedBy,
+        pokedAt: tasks.pokedAt,
+        pokeCount: tasks.pokeCount,
         createdBy: tasks.createdBy,
         lastUpdatedBy: tasks.lastUpdatedBy,
         createdAt: tasks.createdAt,
@@ -388,14 +392,9 @@ app.get('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Create/Assign Task
+// Create/Assign Task (All authorized team members can create tasks)
 app.post('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const userRole = req.user?.role;
-    if (userRole === 'employee') {
-      return res.status(403).json({ error: 'Employees cannot create tasks for others.' });
-    }
-
     const {
       title,
       description,
@@ -419,7 +418,7 @@ app.post('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
       title,
       description,
       assignedEmployeeId: parseInt(assignedEmployeeId, 10),
-      assigningManagerName: req.user?.name || 'HR Manager',
+      assigningManagerName: req.user?.name || 'HR Team',
       relatedResponsibilityId: relatedResponsibilityId ? parseInt(relatedResponsibilityId, 10) : null,
       relatedKpiId: relatedKpiId ? parseInt(relatedKpiId, 10) : null,
       priority: priority || 'Medium',
@@ -429,16 +428,18 @@ app.post('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
       status: 'Not Started',
       progressPercent: 0,
       approvalStatus: 'Not Submitted',
-      createdBy: req.user?.name || 'Manager',
-      lastUpdatedBy: req.user?.name || 'Manager',
+      isPoked: false,
+      pokeCount: 0,
+      createdBy: req.user?.name || 'Team Member',
+      lastUpdatedBy: req.user?.name || 'Team Member',
     }).returning();
 
     // Audit log
     await db.insert(taskAuditLogs).values({
       taskId: newTask.id,
       actionType: 'created',
-      actionSummary: `Task ${taskCode} created and assigned by ${req.user?.name} with deadline ${originalDeadline}.`,
-      performedBy: req.user?.name || 'Manager',
+      actionSummary: `Task ${taskCode} created by ${req.user?.name} and assigned with deadline ${originalDeadline}.`,
+      performedBy: req.user?.name || 'Team Member',
     });
 
     // Notification to assigned employee
@@ -452,6 +453,94 @@ app.post('/api/tasks', requireAuth, async (req: AuthRequest, res: Response) => {
     });
 
     res.json(newTask);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Poke / Urge Task (Only Syeda Shaila Ashraf, Shahriyar Naiem, and Admin)
+app.post('/api/tasks/:id/poke', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role === 'employee') {
+      return res.status(403).json({ error: 'Only Head of HR (Syeda Shaila Ashraf) or Manager (Shahriyar Naiem) can poke/urge tasks.' });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    const existing = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!existing[0]) return res.status(404).json({ error: 'Task not found' });
+    const task = existing[0];
+
+    if (task.status === 'Completed' || task.status === 'Cancelled') {
+      return res.status(400).json({ error: 'Cannot poke a completed or cancelled task.' });
+    }
+
+    const newPokeCount = (task.pokeCount || 0) + 1;
+    const pokedBy = req.user?.name || 'Head of HR';
+    const now = new Date();
+
+    const [updated] = await db
+      .update(tasks)
+      .set({
+        isPoked: true,
+        pokedBy: pokedBy,
+        pokedAt: now,
+        pokeCount: newPokeCount,
+        lastUpdatedBy: pokedBy,
+        updatedAt: now,
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+
+    // Log to task audit logs
+    await db.insert(taskAuditLogs).values({
+      taskId: id,
+      actionType: 'task_poked',
+      actionSummary: `🚨 Task poked/urgent follow-up #${newPokeCount} issued by ${pokedBy}. Immediate action required!`,
+      performedBy: pokedBy,
+    });
+
+    // Notify the assigned employee
+    await db.insert(notifications).values({
+      recipientEmployeeId: task.assignedEmployeeId,
+      title: `🚨 POKE / তাগাদা: ${pokedBy} has poked your task!`,
+      message: `URGENT: ${pokedBy} has poked your task "${task.title}". The task is highlighted in red. Please submit progress or completion immediately!`,
+      type: 'overdue_alert',
+      linkId: id,
+      isRead: false,
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Unpoke / Clear Poke from Task
+app.post('/api/tasks/:id/unpoke', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role === 'employee') {
+      return res.status(403).json({ error: 'Only managers or Head of HR can clear a poke.' });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    const [updated] = await db
+      .update(tasks)
+      .set({
+        isPoked: false,
+        lastUpdatedBy: req.user?.name || 'Manager',
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+
+    await db.insert(taskAuditLogs).values({
+      taskId: id,
+      actionType: 'task_unpoked',
+      actionSummary: `Task poke cleared by ${req.user?.name}.`,
+      performedBy: req.user?.name || 'Manager',
+    });
+
+    res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -605,6 +694,28 @@ app.post('/api/tasks/:id/review', requireAuth, async (req: AuthRequest, res: Res
     });
 
     res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete Task (Permanent removal with cascading dependent records cleanup)
+app.delete('/api/tasks/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!existing[0]) return res.status(404).json({ error: 'Task not found' });
+
+    if (req.user?.role === 'employee') {
+      return res.status(403).json({ error: 'Permission denied: Only managers or Head of HR can delete tasks.' });
+    }
+
+    // Delete dependent child records first
+    await db.delete(deadlineExtensionRequests).where(eq(deadlineExtensionRequests.taskId, id));
+    await db.delete(taskAuditLogs).where(eq(taskAuditLogs.taskId, id));
+    await db.delete(tasks).where(eq(tasks.id, id));
+
+    res.json({ success: true, message: `Task ${existing[0].taskCode} deleted successfully.` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -919,6 +1030,30 @@ app.post('/api/kpis/:id/approve', requireAuth, async (req: AuthRequest, res: Res
       .returning();
 
     res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete KPI (Management Only: Head of HR, Manager, Admin)
+app.delete('/api/kpis/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userRole = req.user?.role;
+    if (userRole === 'employee') {
+      return res.status(403).json({ error: 'Permission denied: Employees (Fariha, Sabbir, Nuzhat, Maisha) cannot delete KPIs.' });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    const existing = await db.select().from(kpis).where(eq(kpis.id, id));
+    if (!existing[0]) return res.status(404).json({ error: 'KPI record not found.' });
+
+    // Unlink any tasks referencing this KPI
+    await db.update(tasks).set({ relatedKpiId: null }).where(eq(tasks.relatedKpiId, id));
+
+    // Delete the KPI row
+    await db.delete(kpis).where(eq(kpis.id, id));
+
+    res.json({ success: true, message: `KPI ${existing[0].kpiCode} deleted successfully.` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

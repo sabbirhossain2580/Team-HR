@@ -13,6 +13,9 @@ import {
   Send,
   ShieldCheck,
   Info,
+  Trash2,
+  X,
+  HelpCircle,
 } from 'lucide-react';
 import { KPI, Employee, KpiMeasurementMethod } from '../types/index.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -22,6 +25,7 @@ interface KpiManagementViewProps {
   employees: Employee[];
   onRefresh: () => void;
   onCreateKpi: (data: any) => Promise<void>;
+  onDeleteKpi: (id: number) => Promise<void>;
   onSubmitKpi: (id: number, data: { actualValue: number; evidenceNotes?: string }) => Promise<void>;
   onReviewKpi: (id: number, data: { status: 'Recommended' | 'Revision Requested'; comments?: string }) => Promise<void>;
   onApproveKpi: (id: number, data: { approvedPercentage: number; reviewStatus?: string }) => Promise<void>;
@@ -32,6 +36,7 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
   employees,
   onRefresh,
   onCreateKpi,
+  onDeleteKpi,
   onSubmitKpi,
   onReviewKpi,
   onApproveKpi,
@@ -43,6 +48,9 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [kpiToDelete, setKpiToDelete] = useState<KPI | null>(null);
+  const [showGuideBanner, setShowGuideBanner] = useState(true);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -151,6 +159,21 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!kpiToDelete) return;
+    try {
+      setActionLoading(true);
+      await onDeleteKpi(kpiToDelete.id);
+      setDeleteModalOpen(false);
+      setKpiToDelete(null);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete KPI');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -188,6 +211,83 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
           </button>
         )}
       </div>
+
+      {/* Quick Guide Banner for KPIs */}
+      {showGuideBanner ? (
+        <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-pink-50 border border-purple-200 rounded-xl p-4 shadow-xs relative">
+          <button
+            onClick={() => setShowGuideBanner(false)}
+            className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+            title="Dismiss Guide"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-start space-x-3">
+            <div className="p-2 bg-purple-600 text-white rounded-lg shrink-0 mt-0.5">
+              <HelpCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-3 flex-1 pr-6">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                  <span>KPI Management &amp; Deletion Guide • কেপিআই পরিচালনা ও মুছে ফেলার নিয়ম</span>
+                  <span className="text-[10px] bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+                    Executive HR &amp; OD
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Renaissance Group এইচআর সিস্টেমে কেপিআই মূল্যায়ন, অনুমোদন ও ডিলিট করার নিয়মাবলী:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {/* Step 1: Add & Submit */}
+                <div className="bg-white/90 backdrop-blur-xs p-3 rounded-lg border border-purple-100 shadow-2xs">
+                  <div className="flex items-center space-x-2 text-purple-900 font-bold mb-1.5">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs">1</span>
+                    <span>নতুন KPI তৈরি ও জমা দেওয়া (Create &amp; Submit)</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-relaxed">
+                    <li>ম্যানেজমেন্ট উপরে ডানপাশের বেগুনি <strong>&quot;+ Create KPI Target&quot;</strong> বাটনে ক্লিক করে টার্গেট সেট করবেন।</li>
+                    <li>সংশ্লিষ্ট কর্মী (Employee) তার সারিতে <strong>&quot;Submit&quot;</strong> বাটনে চাপ দিয়ে অর্জিত মান (Actual Value) ও এভিডেন্স জমা দেবেন।</li>
+                    <li>ম্যানেজার <strong>&quot;Review&quot;</strong> করে রেকমেন্ড করবেন এবং <strong>Head of HR</strong> ফাইনাল অনুমোদন (Approve) করবেন।</li>
+                  </ol>
+                </div>
+
+                {/* Step 2: Delete KPI */}
+                <div className="bg-white/90 backdrop-blur-xs p-3 rounded-lg border border-rose-100 shadow-2xs">
+                  <div className="flex items-center space-x-2 text-rose-900 font-bold mb-1.5">
+                    <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-xs">2</span>
+                    <span>KPI কীভাবে ডিলিট করবেন? (How to Delete KPI)</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-relaxed">
+                    <li>নিচের টেবিলে যে KPI টি বাদ দিতে চান সেটির সারির ডানপাশে যান (Actions কলাম)।</li>
+                    <li>লাল ডাস্টবিন আইকন <strong>(<Trash2 className="w-3 h-3 inline text-red-600" /> Delete)</strong> এ ক্লিক করুন।</li>
+                    <li>নিশ্চিতকরণ পপআপে কোড ও বিস্তারিত দেখে লাল <strong>&quot;Confirm Delete&quot;</strong> এ চাপুন।</li>
+                    <li>KPI টি ডাটাবেজ থেকে মুছে যাবে এবং এর সাথে যুক্ত টাস্কগুলো স্বয়ংক্রিয়ভাবে আনলিঙ্ক হয়ে যাবে।</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-white/70 p-2 rounded border border-slate-200/60 flex items-center justify-between">
+                <div>
+                  <strong className="text-slate-700">অনুমতি ও নিরাপত্তা (Security):</strong> টাস্ক ও কেপিআই অনুমোদন কেবল <strong>Shahriyar Naiem (Manager)</strong> ও <strong>Syeda Shaila Ashraf (Head of HR)</strong> করতে পারেন। সাধারণ এক্সিকিউটিভরা (Fariha, Sabbir, Nuzhat, Maisha) কোনো টাস্ক বা কেপিআই ডিলিট কিংবা অ্যাপ্রুভ করতে পারবে না।
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowGuideBanner(true)}
+            className="text-[11px] text-purple-600 hover:text-purple-800 flex items-center space-x-1 font-medium bg-purple-50 px-2.5 py-1 rounded-md transition"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Show KPI Guide (কেপিআই সহায়িকা দেখুন)</span>
+          </button>
+        </div>
+      )}
 
       {/* Info Callout */}
       <div className="bg-purple-50/70 border border-purple-200 p-3.5 rounded-xl flex items-start space-x-3 text-xs text-purple-900">
@@ -357,6 +457,20 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
                           title="Final Approval by Head of HR"
                         >
                           Approve
+                        </button>
+                      )}
+
+                      {/* Delete KPI (Management Only: Shahriyar Naiem, Syeda Shaila Ashraf, Admin) */}
+                      {canCreate && (
+                        <button
+                          onClick={() => {
+                            setKpiToDelete(kpi);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                          title="Delete KPI (কেপিআই মুছুন)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -644,6 +758,71 @@ export const KpiManagementView: React.FC<KpiManagementViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: DELETE KPI CONFIRMATION */}
+      {deleteModalOpen && kpiToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-red-200 max-w-md w-full p-6 animate-in zoom-in-95">
+            <div className="flex items-center space-x-3 text-red-600 mb-3">
+              <div className="p-2.5 bg-red-100 rounded-full">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete KPI Record</h3>
+                <p className="text-xs text-slate-500">Are you sure you want to delete this KPI?</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-xs space-y-1.5 my-4">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">KPI Code:</span>
+                <span className="font-mono font-bold text-slate-800">{kpiToDelete.kpiCode}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium block">Title:</span>
+                <span className="font-semibold text-slate-800 block mt-0.5">{kpiToDelete.title}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Assigned Employee:</span>
+                <span className="text-slate-700 font-medium">
+                  {kpiToDelete.employeeName || 'Unassigned'}
+                  {kpiToDelete.employeeDesignation ? ` (${kpiToDelete.employeeDesignation})` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Target Value:</span>
+                <span className="font-mono text-slate-700 font-bold">{kpiToDelete.targetValue} {kpiToDelete.unit}</span>
+              </div>
+              <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200 mt-2.5 leading-relaxed">
+                ⚠️ <strong>সতর্কতা:</strong> এই KPI মুছে ফেললে এটি পারফরম্যান্স র‍্যাঙ্কিং হিসাব থেকে বাদ যাবে এবং এর সাথে যুক্ত টাস্কগুলো স্বয়ংক্রিয়ভাবে আনলিঙ্ক হয়ে যাবে।
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setKpiToDelete(null);
+                }}
+                disabled={actionLoading}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              >
+                Cancel (বাতিল)
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{actionLoading ? 'Deleting...' : 'Confirm Delete (ডিলিট নিশ্চিত করুন)'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

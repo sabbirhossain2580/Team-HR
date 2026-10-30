@@ -115,9 +115,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
             Key Performance &amp; Execution Metrics (Database Live)
           </h2>
-          <span className="text-xs text-slate-400">10 Standard Performance Indicators</span>
+          <span className="text-xs text-slate-400">8 Standard Performance Indicators</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           {/* 1. Total Employees */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition">
             <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -192,17 +192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-[11px] text-amber-700 mt-1">Submitted for manager sign-off</div>
           </div>
 
-          {/* 8. Average KPI Achievement */}
-          <div className="bg-white p-4 rounded-xl border border-purple-200 bg-purple-50/20 shadow-xs hover:border-purple-300 transition">
-            <div className="flex items-center justify-between text-purple-700 mb-2">
-              <span className="text-xs font-medium text-purple-900">Avg KPI Achievement</span>
-              <Award className="w-4 h-4 text-purple-600" />
-            </div>
-            <div className="text-2xl font-bold text-purple-700">{cards.avgKpiAchievement}%</div>
-            <div className="text-[11px] text-purple-600 mt-1">Approved weighted score</div>
-          </div>
-
-          {/* 9. On-Time Completion Rate */}
+          {/* 8. On-Time Completion Rate */}
           <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs hover:border-emerald-300 transition">
             <div className="flex items-center justify-between text-emerald-700 mb-2">
               <span className="text-xs font-medium text-emerald-900">On-Time Delivery</span>
@@ -210,16 +200,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="text-2xl font-bold text-emerald-700">{cards.onTimeCompletionRate}%</div>
             <div className="text-[11px] text-emerald-600 mt-1">Delivered on/before deadline</div>
-          </div>
-
-          {/* 10. Employees Requiring Attention */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-medium text-slate-700">Needs Attention</span>
-              <ShieldAlert className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="text-2xl font-bold text-slate-800">{cards.employeesRequiringAttention}</div>
-            <div className="text-[11px] text-slate-500 mt-1">Staff with overdue tasks</div>
           </div>
         </div>
       </div>
@@ -290,63 +270,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Chart 2: Monthly KPI Target vs Actual Achievement */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Monthly KPI Achievement Comparison</h3>
-              <p className="text-xs text-slate-500">Approved weighted score vs 100% target baseline</p>
-            </div>
-            <button
-              onClick={onNavigateToKpis}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-            >
-              View KPIs &rarr;
-            </button>
-          </div>
-
-          <div className="space-y-4 pt-2">
-            {charts.kpiComparison.map((emp) => {
-              const actual = emp.actual;
-              const isPassing = actual >= 90;
-              const isOver = actual > 100;
-
-              return (
-                <div key={emp.fullName} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-800">{emp.fullName}</span>
-                    <span className="font-bold text-slate-900">
-                      {actual > 0 ? `${actual}%` : 'Pending Approval'}
-                    </span>
-                  </div>
-                  {/* Target benchmark line + actual bar */}
-                  <div className="relative w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      style={{ width: `${Math.min(100, (actual / 120) * 100)}%` }}
-                      className={`h-full transition-all ${
-                        actual === 0
-                          ? 'bg-slate-300'
-                          : isOver
-                          ? 'bg-purple-600'
-                          : isPassing
-                          ? 'bg-indigo-600'
-                          : 'bg-amber-500'
-                      }`}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-slate-500">
-                    <span>Target: 100% Benchmark</span>
-                    <span className={actual >= 100 ? 'text-purple-600 font-bold' : 'text-slate-500'}>
-                      {actual > 0 ? (actual >= 100 ? 'Target Exceeded' : 'On Track') : 'Awaiting Review'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chart 3: Completed vs Pending vs Overdue Distribution */}
+        {/* Chart 2: Completed vs Pending vs Overdue Distribution */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -381,40 +305,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             })}
           </div>
         </div>
-
-        {/* Chart 4: Department Performance & On-Time Delivery Trend */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Monthly Department Performance Trend</h3>
-              <p className="text-xs text-slate-500">On-time completion % and average KPI score trend</p>
-            </div>
-            <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded font-medium">May - Oct 2026</span>
-          </div>
-
-          <div className="space-y-3">
-            {charts.monthlyTrend.map((m) => (
-              <div key={m.month} className="space-y-1 text-xs">
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-700">
-                  <span>{m.month}</span>
-                  <div className="space-x-3">
-                    <span className="text-emerald-700 font-bold">On-Time: {m.onTimeRate}%</span>
-                    <span className="text-indigo-700 font-bold">KPI: {m.kpiScore}%</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div style={{ width: `${m.onTimeRate}%` }} className="h-full bg-emerald-500 rounded-full" />
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div style={{ width: `${m.kpiScore}%` }} className="h-full bg-indigo-500 rounded-full" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
+

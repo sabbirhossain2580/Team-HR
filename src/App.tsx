@@ -3,13 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Navbar } from './components/Navbar.tsx';
 import { Sidebar, NavTab } from './components/Sidebar.tsx';
+import { LoginScreen } from './components/LoginScreen.tsx';
 import { DashboardView } from './components/DashboardView.tsx';
 import { OverdueAlertCenter } from './components/OverdueAlertCenter.tsx';
 import { EmployeeDirectoryView } from './components/EmployeeDirectoryView.tsx';
 import { ResponsibilitiesView } from './components/ResponsibilitiesView.tsx';
 import { TaskRegisterView } from './components/TaskRegisterView.tsx';
-import { KpiManagementView } from './components/KpiManagementView.tsx';
-import { MonthlyPerformanceView } from './components/MonthlyPerformanceView.tsx';
 import { ReportsExportView } from './components/ReportsExportView.tsx';
 import { AdminSetupWizardView } from './components/AdminSetupWizardView.tsx';
 import { NotificationsModal } from './components/NotificationsModal.tsx';
@@ -23,11 +22,10 @@ import {
   NotificationItem,
   AppSetting,
   PerformanceRankItem,
-  DelayCategory,
 } from './types/index.ts';
 
 const MainAppContent: React.FC = () => {
-  const { activePersona } = useAuth();
+  const { activePersona, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
 
   // Application Data States
@@ -37,7 +35,6 @@ const MainAppContent: React.FC = () => {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [rankings, setRankings] = useState<PerformanceRankItem[]>([]);
-  const [methodology, setMethodology] = useState<any>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<AppSetting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,18 +44,19 @@ const MainAppContent: React.FC = () => {
 
   // Load all data from API
   const loadData = async () => {
+    if (!isAuthenticated) return;
     try {
       setLoading(true);
       const [
-        dashStats,
-        empList,
-        taskList,
-        kpiList,
-        respList,
-        rankData,
-        notifList,
-        settingsList,
-      ] = await Promise.all([
+        dashStatsRes,
+        empListRes,
+        taskListRes,
+        kpiListRes,
+        respListRes,
+        rankDataRes,
+        notifListRes,
+        settingsListRes,
+      ] = await Promise.allSettled([
         api.getDashboardStats(),
         api.getEmployees(),
         api.getTasks(),
@@ -69,15 +67,16 @@ const MainAppContent: React.FC = () => {
         api.getSettings(),
       ]);
 
-      setStats(dashStats);
-      setEmployees(empList);
-      setTasks(taskList);
-      setKpis(kpiList);
-      setResponsibilities(respList);
-      setRankings(rankData.rankings);
-      setMethodology(rankData.methodology);
-      setNotifications(notifList);
-      setSettings(settingsList);
+      if (dashStatsRes.status === 'fulfilled') setStats(dashStatsRes.value);
+      if (empListRes.status === 'fulfilled') setEmployees(empListRes.value);
+      if (taskListRes.status === 'fulfilled') setTasks(taskListRes.value);
+      if (kpiListRes.status === 'fulfilled') setKpis(kpiListRes.value);
+      if (respListRes.status === 'fulfilled') setResponsibilities(respListRes.value);
+      if (rankDataRes.status === 'fulfilled') {
+        setRankings(rankDataRes.value.rankings || []);
+      }
+      if (notifListRes.status === 'fulfilled') setNotifications(notifListRes.value || []);
+      if (settingsListRes.status === 'fulfilled') setSettings(settingsListRes.value || []);
     } catch (error) {
       console.error('Failed to load portal data:', error);
     } finally {
@@ -86,23 +85,39 @@ const MainAppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, [activePersona]);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [activePersona, isAuthenticated]);
 
-  // Overdue count calculation
+  // If not authenticated, require Employee ID & Password entry (no password hints!)
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  // Overdue, Poked & Assigned counts
   const overdueCount = tasks.filter((t) => t.isOverdue).length;
+  const pokedCount = tasks.filter((t) => t.isPoked).length;
   const pendingApprovalCount = tasks.filter(
     (t) => t.status === 'Submitted for Review' || t.approvalStatus === 'Pending Review'
   ).length;
 
+  const currentEmpId = employees.find((e) => e.employeeCode === activePersona.employeeCode)?.id;
+  const myTaskCount = tasks.filter(
+    (t) =>
+      t.employeeCode === activePersona.employeeCode ||
+      (currentEmpId != null && t.assignedEmployeeId === currentEmpId) ||
+      t.employeeName?.toLowerCase() === activePersona.name.toLowerCase()
+  ).length;
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-600 selection:text-white">
-      {/* Top Corporate Navbar with Live Asia/Dhaka Status & Multi-Role Switcher */}
+      {/* Top Corporate Navbar with Live Asia/Dhaka Status */}
       <Navbar
         overdueCount={overdueCount}
         notifications={notifications}
         onOpenNotifications={() => setNotificationsOpen(true)}
-        onNavigateToOverdue={() => setActiveTab('overdue')}
+        onNavigateToOverdue={() => setActiveTab('poked-overdue')}
       />
 
       {/* Main Workspace with Sidebar & Active View */}
@@ -114,6 +129,8 @@ const MainAppContent: React.FC = () => {
             setActiveTab={setActiveTab}
             overdueCount={overdueCount}
             pendingApprovalCount={pendingApprovalCount}
+            pokedCount={pokedCount}
+            myTaskCount={myTaskCount}
           />
         </div>
 
@@ -126,31 +143,160 @@ const MainAppContent: React.FC = () => {
                 tasks={tasks}
                 employees={employees}
                 loading={loading}
-                onNavigateToOverdue={() => setActiveTab('overdue')}
+                onNavigateToOverdue={() => setActiveTab('poked-overdue')}
                 onNavigateToTasks={() => setActiveTab('tasks')}
-                onNavigateToKpis={() => setActiveTab('kpis')}
+                onNavigateToKpis={() => setActiveTab('tasks')}
               />
             )}
 
-            {activeTab === 'overdue' && (
-              <OverdueAlertCenter
+            {activeTab === 'tasks' && (
+              <TaskRegisterView
                 tasks={tasks}
+                employees={employees}
+                responsibilities={responsibilities}
+                viewMode="all"
                 onRefresh={loadData}
-                onSubmitDelayReason={async (taskId, reason, category) => {
-                  await api.updateTask(taskId, {
-                    delayReason: reason,
-                    delayCategory: category,
-                  });
+                onCreateTask={async (data) => {
+                  await api.createTask(data);
+                  await loadData();
                 }}
-                onRequestExtension={async (taskId, newDeadline, category, reason) => {
-                  await api.requestExtension(taskId, {
-                    requestedDeadline: newDeadline,
-                    reasonCategory: category,
-                    detailedReason: reason,
-                  });
+                onUpdateTask={async (id, data) => {
+                  await api.updateTask(id, data);
+                  await loadData();
                 }}
-                onAddManagerComment={async (taskId, comment) => {
-                  await api.updateTask(taskId, { managerComments: comment });
+                onDeleteTask={async (id) => {
+                  await api.deleteTask(id);
+                  await loadData();
+                }}
+                onSubmitTask={async (id, data) => {
+                  await api.submitTask(id, data);
+                  await loadData();
+                }}
+                onReviewTask={async (id, data) => {
+                  await api.reviewTask(id, data);
+                  await loadData();
+                }}
+                onRequestExtension={async (id, data) => {
+                  await api.requestExtension(id, data);
+                  await loadData();
+                }}
+                onDecideExtension={async (id, data) => {
+                  await api.decideExtension(id, data);
+                  await loadData();
+                }}
+              />
+            )}
+
+            {activeTab === 'my-tasks' && (
+              <TaskRegisterView
+                tasks={tasks}
+                employees={employees}
+                responsibilities={responsibilities}
+                viewMode="my-tasks"
+                onRefresh={loadData}
+                onCreateTask={async (data) => {
+                  await api.createTask(data);
+                  await loadData();
+                }}
+                onUpdateTask={async (id, data) => {
+                  await api.updateTask(id, data);
+                  await loadData();
+                }}
+                onDeleteTask={async (id) => {
+                  await api.deleteTask(id);
+                  await loadData();
+                }}
+                onSubmitTask={async (id, data) => {
+                  await api.submitTask(id, data);
+                  await loadData();
+                }}
+                onReviewTask={async (id, data) => {
+                  await api.reviewTask(id, data);
+                  await loadData();
+                }}
+                onRequestExtension={async (id, data) => {
+                  await api.requestExtension(id, data);
+                  await loadData();
+                }}
+                onDecideExtension={async (id, data) => {
+                  await api.decideExtension(id, data);
+                  await loadData();
+                }}
+              />
+            )}
+
+            {activeTab === 'pending-approvals' && (
+              <TaskRegisterView
+                tasks={tasks}
+                employees={employees}
+                responsibilities={responsibilities}
+                viewMode="pending-approvals"
+                onRefresh={loadData}
+                onCreateTask={async (data) => {
+                  await api.createTask(data);
+                  await loadData();
+                }}
+                onUpdateTask={async (id, data) => {
+                  await api.updateTask(id, data);
+                  await loadData();
+                }}
+                onDeleteTask={async (id) => {
+                  await api.deleteTask(id);
+                  await loadData();
+                }}
+                onSubmitTask={async (id, data) => {
+                  await api.submitTask(id, data);
+                  await loadData();
+                }}
+                onReviewTask={async (id, data) => {
+                  await api.reviewTask(id, data);
+                  await loadData();
+                }}
+                onRequestExtension={async (id, data) => {
+                  await api.requestExtension(id, data);
+                  await loadData();
+                }}
+                onDecideExtension={async (id, data) => {
+                  await api.decideExtension(id, data);
+                  await loadData();
+                }}
+              />
+            )}
+
+            {activeTab === 'poked-overdue' && (
+              <TaskRegisterView
+                tasks={tasks}
+                employees={employees}
+                responsibilities={responsibilities}
+                viewMode="poked-overdue"
+                onRefresh={loadData}
+                onCreateTask={async (data) => {
+                  await api.createTask(data);
+                  await loadData();
+                }}
+                onUpdateTask={async (id, data) => {
+                  await api.updateTask(id, data);
+                  await loadData();
+                }}
+                onDeleteTask={async (id) => {
+                  await api.deleteTask(id);
+                  await loadData();
+                }}
+                onSubmitTask={async (id, data) => {
+                  await api.submitTask(id, data);
+                  await loadData();
+                }}
+                onReviewTask={async (id, data) => {
+                  await api.reviewTask(id, data);
+                  await loadData();
+                }}
+                onRequestExtension={async (id, data) => {
+                  await api.requestExtension(id, data);
+                  await loadData();
+                }}
+                onDecideExtension={async (id, data) => {
+                  await api.decideExtension(id, data);
+                  await loadData();
                 }}
               />
             )}
@@ -164,84 +310,11 @@ const MainAppContent: React.FC = () => {
                 onRefresh={loadData}
                 onCreateEmployee={async (data) => {
                   await api.createEmployee(data);
+                  await loadData();
                 }}
                 onUpdateEmployee={async (id, data) => {
                   await api.updateEmployee(id, data);
-                }}
-              />
-            )}
-
-            {activeTab === 'responsibilities' && (
-              <ResponsibilitiesView
-                responsibilities={responsibilities}
-                employees={employees}
-                onRefresh={loadData}
-                onCreateResponsibility={async (data) => {
-                  await api.createResponsibility(data);
-                }}
-                onUpdateResponsibility={async (id, data) => {
-                  await api.updateResponsibility(id, data);
-                }}
-              />
-            )}
-
-            {activeTab === 'tasks' && (
-              <TaskRegisterView
-                tasks={tasks}
-                employees={employees}
-                responsibilities={responsibilities}
-                onRefresh={loadData}
-                onCreateTask={async (data) => {
-                  await api.createTask(data);
-                }}
-                onUpdateTask={async (id, data) => {
-                  await api.updateTask(id, data);
-                }}
-                onSubmitTask={async (id, data) => {
-                  await api.submitTask(id, data);
-                }}
-                onReviewTask={async (id, data) => {
-                  await api.reviewTask(id, data);
-                }}
-                onRequestExtension={async (id, data) => {
-                  await api.requestExtension(id, data);
-                }}
-                onDecideExtension={async (id, data) => {
-                  await api.decideExtension(id, data);
-                }}
-              />
-            )}
-
-            {activeTab === 'kpis' && (
-              <KpiManagementView
-                kpis={kpis}
-                employees={employees}
-                onRefresh={loadData}
-                onCreateKpi={async (data) => {
-                  await api.createKpi(data);
-                }}
-                onSubmitKpi={async (id, data) => {
-                  await api.submitKpi(id, data);
-                }}
-                onReviewKpi={async (id, data) => {
-                  await api.reviewKpi(id, data);
-                }}
-                onApproveKpi={async (id, data) => {
-                  await api.approveKpi(id, data);
-                }}
-              />
-            )}
-
-            {activeTab === 'ranking' && (
-              <MonthlyPerformanceView
-                rankings={rankings}
-                methodology={methodology}
-                onRefresh={loadData}
-                onUpdateWeights={async (kpiWeight, taskWeight) => {
-                  await api.updateSettings([
-                    { settingKey: 'scoring_kpi_weight', settingValue: String(kpiWeight) },
-                    { settingKey: 'scoring_task_weight', settingValue: String(taskWeight) },
-                  ]);
+                  await loadData();
                 }}
               />
             )}
@@ -263,9 +336,11 @@ const MainAppContent: React.FC = () => {
                 onRefresh={loadData}
                 onUpdateSettings={async (settingsList) => {
                   await api.updateSettings(settingsList);
+                  await loadData();
                 }}
                 onResetSeed={async () => {
                   await api.resetSeed();
+                  await loadData();
                 }}
               />
             )}

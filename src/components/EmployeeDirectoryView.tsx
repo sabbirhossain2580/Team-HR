@@ -190,7 +190,7 @@ export const EmployeeDirectoryView: React.FC<EmployeeDirectoryViewProps> = ({
                 <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center space-x-2 text-xs text-slate-600">
                   <GitBranch className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="text-[11px]">
-                    Reports to: <strong className="text-slate-800">{emp.reportingManagerName || 'Board / MD'}</strong>
+                    Reports to: <strong className="text-slate-800">{emp.isHeadOfHr ? 'Managing Director / Board' : 'Syeda Shaila Ashraf (Head of HR)'}</strong>
                   </span>
                 </div>
 

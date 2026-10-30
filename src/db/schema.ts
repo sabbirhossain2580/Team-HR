@@ -78,6 +78,10 @@ export const tasks = pgTable('tasks', {
   managerComments: text('manager_comments'),
   supportingAttachments: text('supporting_attachments'), // JSON or text
   approvalStatus: text('approval_status').notNull().default('Not Submitted'), // 'Not Submitted' | 'Pending Review' | 'Approved' | 'Revision Requested' | 'Rejected'
+  isPoked: boolean('is_poked').notNull().default(false),
+  pokedBy: text('poked_by'),
+  pokedAt: timestamp('poked_at'),
+  pokeCount: integer('poke_count').notNull().default(0),
   createdBy: text('created_by').notNull(),
   lastUpdatedBy: text('last_updated_by'),
   createdAt: timestamp('created_at').defaultNow(),

@@ -10,6 +10,11 @@ import {
   Building,
   Printer,
   ShieldAlert,
+  ExternalLink,
+  Sparkles,
+  Layers,
+  ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -21,6 +26,8 @@ import {
   Responsibility,
   PerformanceRankItem,
 } from '../types/index.ts';
+import { googleSheetsApi, CreateSheetResult } from '../lib/googleSheets.ts';
+import { getCachedAccessToken, signInWithGoogleWorkspace } from '../lib/firebase.ts';
 
 interface ReportsExportViewProps {
   tasks: Task[];
@@ -38,8 +45,14 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
   rankings,
 }) => {
   const [selectedReportId, setSelectedReportId] = useState<number>(1);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Google Sheets state
+  const [sheetsModalOpen, setSheetsModalOpen] = useState(false);
+  const [sheetsConfirmOpen, setSheetsConfirmOpen] = useState(false);
+  const [sheetResult, setSheetResult] = useState<CreateSheetResult | null>(null);
+  const [sheetsExporting, setSheetsExporting] = useState(false);
+  const [targetExportType, setTargetExportType] = useState<'master' | 'selected'>('master');
 
   const reportList = [
     {
@@ -93,6 +106,77 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
       description: 'Modifications, deadline extensions, and chronological change actions.',
     },
   ];
+
+  // Initiate Google Sheets export with user confirmation
+  const initiateGoogleSheetsExport = (type: 'master' | 'selected') => {
+    setTargetExportType(type);
+    setSheetResult(null);
+    setSheetsConfirmOpen(true);
+  };
+
+  // Perform Google Sheets creation
+  const handleConfirmGoogleSheetsExport = async () => {
+    setSheetsConfirmOpen(false);
+    setSheetsExporting(true);
+    setSheetsModalOpen(true);
+
+    try {
+      let token = getCachedAccessToken();
+      if (!token) {
+        // Trigger Google Workspace Auth popup
+        const authRes = await signInWithGoogleWorkspace();
+        token = authRes.accessToken;
+      }
+
+      let result: CreateSheetResult;
+
+      if (targetExportType === 'master') {
+        result = await googleSheetsApi.exportComprehensiveMasterSheet({
+          tasks,
+          employees,
+          kpis,
+          responsibilities,
+          rankings,
+        });
+      } else {
+        const curReport = reportList.find((r) => r.id === selectedReportId) || reportList[0];
+        // Create single tab sheet
+        const sheetTitle = curReport.title.slice(3);
+        const rows = tasks.map((t) => [
+          t.taskCode,
+          t.title,
+          t.employeeName,
+          t.employeeDesignation,
+          t.priority,
+          t.startDate,
+          t.originalDeadline,
+          t.revisedDeadline || 'N/A',
+          t.calculatedStatus,
+          `${t.progressPercent}%`,
+          t.delayReason || 'None',
+          t.managerComments || 'Pending',
+        ]);
+
+        result = await googleSheetsApi.createSpreadsheet(
+          `Renaissance Group — ${sheetTitle} (${new Date().toLocaleDateString('en-GB')})`,
+          [
+            {
+              title: 'Report Data',
+              headers: ['Code', 'Title', 'Assignee', 'Designation', 'Priority', 'Start Date', 'Deadline', 'Revised', 'Status', 'Progress', 'Delay Reason', 'Manager Comments'],
+              rows,
+            },
+          ]
+        );
+      }
+
+      setSheetResult(result);
+    } catch (err: any) {
+      alert(`Google Sheets export error: ${err.message}`);
+      setSheetsModalOpen(false);
+    } finally {
+      setSheetsExporting(false);
+    }
+  };
 
   // Excel Export Handler
   const exportToExcel = (reportId: number) => {
@@ -213,7 +297,7 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
     }
   };
 
-  // PDF Export Handler (Corporate Layout with jsPDF & AutoTable)
+  // PDF Export Handler
   const exportToPdf = (reportId: number) => {
     setIsExporting(true);
     try {
@@ -221,7 +305,7 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
       const currentReport = reportList.find((r) => r.id === reportId) || reportList[0];
 
       // Corporate Header
-      doc.setFillColor(15, 23, 42); // slate-900
+      doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 297, 24, 'F');
 
       doc.setTextColor(255, 255, 255);
@@ -232,7 +316,7 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(203, 213, 225);
-      doc.text(`Official Performance Document • Cycle: October 2026 • Timezone: Asia/Dhaka`, 14, 18);
+      doc.text(`Official Performance Document • Head of HR: Syeda Shaila Ashraf • Timezone: Asia/Dhaka`, 14, 18);
 
       // Report Title
       doc.setTextColor(15, 23, 42);
@@ -361,7 +445,7 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
             <div>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Reporting &amp; Corporate Export Center</h1>
               <p className="text-xs md:text-sm text-slate-500">
-                10 Official HR reports with real structured Excel and publication-ready PDF exports
+                10 Official HR reports with real Google Sheets, Excel (.xlsx), and PDF exports
               </p>
             </div>
           </div>
@@ -369,8 +453,36 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
 
         <div className="flex items-center space-x-2 text-xs">
           <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
-            Confidential Internal HR Record
+            Head of HR: Syeda Shaila Ashraf
           </span>
+        </div>
+      </div>
+
+      {/* FEATURED: GOOGLE SHEETS LIVE EXPORT CARD */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white p-6 rounded-2xl shadow-md border border-emerald-700/50">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] font-bold bg-emerald-500 text-slate-950 px-2.5 py-0.5 rounded uppercase tracking-wider">
+                Google Workspace Integration
+              </span>
+              <span className="text-xs text-emerald-300">Live Cloud Spreadsheet</span>
+            </div>
+            <h2 className="text-lg font-bold">Export Master HR Performance Workbook to Google Sheets</h2>
+            <p className="text-xs text-emerald-100/90 max-w-2xl leading-relaxed">
+              Creates a multi-tab Google Spreadsheet directly in your Google Drive with 5 dedicated tabs: Task Register, Critical Overdue Focus, KPI Performance Scorecard, Monthly Rankings, and Responsibility Register.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={() => initiateGoogleSheetsExport('master')}
+              className="flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Master Google Sheet</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -396,14 +508,28 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">{rep.description}</p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedReportId(rep.id);
+                    initiateGoogleSheetsExport('selected');
+                  }}
+                  className="flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold rounded-lg transition"
+                  title="Export this report to Google Sheets"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Google Sheets</span>
+                </button>
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     exportToExcel(rep.id);
                   }}
                   disabled={isExporting}
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs transition"
+                  className="flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg transition"
+                  title="Download Excel spreadsheet"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
                   <span>Excel (.xlsx)</span>
@@ -415,7 +541,8 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
                     exportToPdf(rep.id);
                   }}
                   disabled={isExporting}
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs transition"
+                  className="flex items-center space-x-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs transition"
+                  title="Download printable corporate PDF"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>PDF (.pdf)</span>
@@ -425,6 +552,100 @@ export const ReportsExportView: React.FC<ReportsExportViewProps> = ({
           );
         })}
       </div>
+
+      {/* USER CONFIRMATION DIALOG (Mandatory for Workspace Mutating Operations) */}
+      {sheetsConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95">
+            <div className="flex items-center space-x-3 text-emerald-600 mb-3">
+              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg">
+                <FileSpreadsheet className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Create Google Spreadsheet?</h3>
+                <p className="text-xs text-slate-500">Google Drive &amp; Sheets File Creation</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200">
+              This action will create a new Google Spreadsheet file named <strong className="text-slate-900">"Renaissance Group — HR &amp; OD Master Performance Sheet"</strong> in your connected Google Drive account with live database records, KPIs, rankings, and task accountability data.
+            </p>
+
+            <div className="mt-4 text-xs text-slate-500 space-y-1">
+              <div>• <strong>Destination:</strong> Your Google Drive</div>
+              <div>• <strong>Included Records:</strong> {tasks.length} Tasks, {kpis.length} KPIs, {rankings.length} Ranked Personnel</div>
+              <div>• <strong>Permissions:</strong> Stored securely in your private Drive folder</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2.5 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setSheetsConfirmOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmGoogleSheetsExport}
+                className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs flex items-center space-x-1.5"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Confirm &amp; Create Sheet</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GOOGLE SHEETS RESULT MODAL */}
+      {sheetsModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95">
+            {sheetsExporting ? (
+              <div className="py-8 flex flex-col items-center justify-center space-y-3">
+                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                <h4 className="text-sm font-bold text-slate-900">Creating Google Spreadsheet...</h4>
+                <p className="text-xs text-slate-500">Writing multi-tab structured HR performance data to Google Sheets</p>
+              </div>
+            ) : sheetResult ? (
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-base font-bold text-slate-900">Google Sheet Created Successfully!</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Your HR Task &amp; KPI Performance Workbook is ready on your Google Drive.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
+                  <div className="font-semibold text-slate-800">Spreadsheet ID:</div>
+                  <div className="font-mono text-[11px] truncate text-slate-500">{sheetResult.spreadsheetId}</div>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <a
+                    href={sheetResult.spreadsheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-lg shadow-xs transition"
+                  >
+                    <span>Open in Google Sheets</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+
+                  <button
+                    onClick={() => setSheetsModalOpen(false)}
+                    className="w-full py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

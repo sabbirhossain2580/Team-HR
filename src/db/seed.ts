@@ -82,23 +82,23 @@ export async function seedDatabase(forceReset = false) {
     ]).onConflictDoNothing();
 
     // 2. Head of HR & 5 Core Team Employees
-    // Configurable Head of HR account (separate supervisory role, not Shahriyar Naiem)
+    // Configurable Head of HR account (Syeda Shaila Ashraf, Head of HR - supervisory role)
     const [headOfHr] = await db.insert(employees).values({
-      employeeCode: 'EMP-000',
-      name: 'Dr. Kazi Mahbubur Rahman',
-      email: 'head.hr@renaissance.com.bd',
-      designation: 'Head of HR & OD',
+      employeeCode: '01-02-0440',
+      name: 'Syeda Shaila Ashraf',
+      email: 'syeda.shaila@renaissance.com.bd',
+      designation: 'Head of HR',
       department: 'Human Resources & OD',
       reportingManagerName: 'Managing Director, Renaissance Group',
       status: 'active',
       isHeadOfHr: true,
-      avatarInitials: 'KM',
+      avatarInitials: 'SA',
       joinDate: '2021-01-15',
     }).returning();
 
     // 1. Shahriyar Naiem — Manager, HR & OD
     const [shahriyar] = await db.insert(employees).values({
-      employeeCode: 'EMP-001',
+      employeeCode: '22-02-1826',
       name: 'Shahriyar Naiem',
       email: 'shahriyar.naiem@renaissance.com.bd',
       designation: 'Manager, HR & OD',
@@ -113,13 +113,13 @@ export async function seedDatabase(forceReset = false) {
 
     // 2. Quazi Nuzhat Rahman — Senior Executive, HR
     const [nuzhat] = await db.insert(employees).values({
-      employeeCode: 'EMP-002',
+      employeeCode: '22-02-1330',
       name: 'Quazi Nuzhat Rahman',
       email: 'quazi.nuzhat@renaissance.com.bd',
       designation: 'Senior Executive, HR',
       department: 'Human Resources & OD',
-      reportingManagerId: shahriyar.id,
-      reportingManagerName: shahriyar.name,
+      reportingManagerId: headOfHr.id,
+      reportingManagerName: headOfHr.name,
       status: 'active',
       isHeadOfHr: false,
       avatarInitials: 'QN',
@@ -128,13 +128,13 @@ export async function seedDatabase(forceReset = false) {
 
     // 3. Sabbir Hossain — Executive, HR
     const [sabbir] = await db.insert(employees).values({
-      employeeCode: 'EMP-003',
+      employeeCode: '22-02-1642',
       name: 'Sabbir Hossain',
       email: 'sabbir.hossain@renaissance.com.bd',
       designation: 'Executive, HR',
       department: 'Human Resources & OD',
-      reportingManagerId: shahriyar.id,
-      reportingManagerName: shahriyar.name,
+      reportingManagerId: headOfHr.id,
+      reportingManagerName: headOfHr.name,
       status: 'active',
       isHeadOfHr: false,
       avatarInitials: 'SH',
@@ -143,13 +143,13 @@ export async function seedDatabase(forceReset = false) {
 
     // 4. Maisha Islam — Assistant Executive, HR
     const [maisha] = await db.insert(employees).values({
-      employeeCode: 'EMP-004',
+      employeeCode: '22-02-1551',
       name: 'Maisha Islam',
       email: 'maisha.islam@renaissance.com.bd',
       designation: 'Assistant Executive, HR',
       department: 'Human Resources & OD',
-      reportingManagerId: shahriyar.id,
-      reportingManagerName: shahriyar.name,
+      reportingManagerId: headOfHr.id,
+      reportingManagerName: headOfHr.name,
       status: 'active',
       isHeadOfHr: false,
       avatarInitials: 'MI',
@@ -158,13 +158,13 @@ export async function seedDatabase(forceReset = false) {
 
     // 5. Fariha Nasmi — Assistant Executive, HR
     const [fariha] = await db.insert(employees).values({
-      employeeCode: 'EMP-005',
+      employeeCode: '02-02-2059',
       name: 'Fariha Nasmi',
       email: 'fariha.nasmi@renaissance.com.bd',
       designation: 'Assistant Executive, HR',
       department: 'Human Resources & OD',
-      reportingManagerId: shahriyar.id,
-      reportingManagerName: shahriyar.name,
+      reportingManagerId: headOfHr.id,
+      reportingManagerName: headOfHr.name,
       status: 'active',
       isHeadOfHr: false,
       avatarInitials: 'FN',
@@ -220,7 +220,7 @@ export async function seedDatabase(forceReset = false) {
         email: 'admin@renaissance.com.bd',
         name: 'System Administrator',
         role: 'admin',
-        employeeCode: 'ADMIN-01',
+        employeeCode: '02-02-2222',
       },
     ]).onConflictDoNothing();
 

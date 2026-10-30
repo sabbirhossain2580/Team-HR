@@ -169,7 +169,7 @@ export const AdminSetupWizardView: React.FC<AdminSetupWizardViewProps> = ({
                 className="w-full border border-slate-300 rounded-lg p-2.5 bg-white"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Current assignee: Dr. Kazi Mahbubur Rahman (EMP-000)
+                Current assignee: Syeda Shaila Ashraf, Head of HR (EMP-000)
               </span>
             </div>
 

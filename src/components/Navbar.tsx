@@ -1,17 +1,14 @@
-// src/components/Navbar.tsx
 import React, { useState } from 'react';
-import { useAuth, PRESET_PERSONAS, PersonaOption } from '../context/AuthContext.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
 import {
   Bell,
-  CheckCircle2,
   AlertTriangle,
-  UserCheck,
   ChevronDown,
-  Shield,
   Clock,
-  Sparkles,
   LogOut,
   Building2,
+  ShieldCheck,
+  User,
 } from 'lucide-react';
 import { NotificationItem } from '../types/index.ts';
 
@@ -28,15 +25,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications,
   onNavigateToOverdue,
 }) => {
-  const { user, activePersona, switchPersona, loginWithGoogle, logout } = useAuth();
+  const {
+    activePersona,
+    logout,
+  } = useAuth();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const roleLabelMap: Record<string, { label: string; bg: string; text: string }> = {
     head_of_hr: { label: 'Head of HR', bg: 'bg-purple-100 text-purple-900 border-purple-300', text: 'text-purple-700' },
     hr_manager: { label: 'HR Manager', bg: 'bg-blue-100 text-blue-900 border-blue-300', text: 'text-blue-700' },
-    employee: { label: 'HR Employee', bg: 'bg-emerald-100 text-emerald-900 border-emerald-300', text: 'text-emerald-700' },
-    admin: { label: 'System Admin', bg: 'bg-slate-100 text-slate-900 border-slate-300', text: 'text-slate-700' },
+    employee: { label: 'HR Executive', bg: 'bg-emerald-100 text-emerald-900 border-emerald-300', text: 'text-emerald-700' },
+    admin: { label: 'System Admin', bg: 'bg-rose-100 text-rose-900 border-rose-300', text: 'text-rose-700' },
   };
 
   const currentRoleStyle = roleLabelMap[activePersona.role] || roleLabelMap.employee;
@@ -55,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               HR &amp; OD
             </span>
           </div>
-          <p className="text-xs text-slate-400 hidden sm:block">Task, Responsibility &amp; KPI Performance Management System</p>
+          <p className="text-xs text-slate-400 hidden sm:block">Task &amp; Follow-up Management System</p>
         </div>
       </div>
 
@@ -66,13 +67,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="font-medium">Asia/Dhaka</span>
         </div>
         <span className="text-slate-500">•</span>
-        <span>Corporate Cutoff: 23:59</span>
+        <span>Cutoff: 23:59</span>
         <span className="text-slate-500">•</span>
-        <span className="text-slate-200 font-medium">Cycle: October 2026</span>
+        <span className="text-slate-200 font-medium">Logged in ID: <span className="font-mono text-amber-400 font-bold">{activePersona.employeeCode}</span></span>
       </div>
 
-      {/* Right Controls: Overdue Alert button, Notifications, Persona Switcher */}
-      <div className="flex items-center space-x-3">
+      {/* Right Controls */}
+      <div className="flex items-center space-x-2.5">
         {/* Critical Overdue Alert Trigger */}
         {overdueCount > 0 && (
           <button
@@ -99,18 +100,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </button>
 
-        {/* Quick Persona / Role Switcher for Multi-Role Verification */}
+        {/* Current Active Persona / Profile Menu */}
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-200 transition"
           >
-            <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px]">
+            <div className="w-7 h-7 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[11px]">
               {activePersona.avatarInitials}
             </div>
             <div className="text-left hidden sm:block">
-              <div className="text-xs font-semibold leading-tight">{activePersona.name}</div>
-              <div className="text-[10px] text-slate-400">{activePersona.designation}</div>
+              <div className="text-xs font-semibold leading-tight">
+                {activePersona.name}
+              </div>
+              <div className="text-[10px] text-amber-300 font-mono">ID: {activePersona.employeeCode}</div>
             </div>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${currentRoleStyle.bg}`}>
               {currentRoleStyle.label}
@@ -118,71 +121,56 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
-          {/* Persona Selection Dropdown */}
+          {/* User Menu Dropdown: Clean Profile Card & Sign Out (No employee switcher) */}
           {dropdownOpen && (
             <div
-              className="absolute right-0 mt-2 w-80 bg-white text-slate-900 rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2"
+              className="absolute right-0 mt-2 w-72 bg-white text-slate-900 rounded-xl shadow-2xl border border-slate-200 py-3 z-50 animate-in fade-in slide-in-from-top-2"
               onMouseLeave={() => setDropdownOpen(false)}
             >
-              <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Switch Active Role / User</span>
-                  <p className="text-[11px] text-slate-500">Test multi-role permissions &amp; access control</p>
+              {/* Profile Card Header */}
+              <div className="px-4 pb-3 border-b border-slate-100 flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-xs">
+                  {activePersona.avatarInitials}
                 </div>
-                <Shield className="w-4 h-4 text-indigo-600" />
+                <div className="flex-1 truncate">
+                  <div className="text-xs font-bold text-slate-900 truncate">{activePersona.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{activePersona.designation}</div>
+                  <div className="text-[10px] text-indigo-700 font-mono font-bold mt-0.5">
+                    ID: {activePersona.employeeCode}
+                  </div>
+                </div>
               </div>
 
-              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
-                {PRESET_PERSONAS.map((persona) => {
-                  const isSelected = activePersona.email === persona.email;
-                  const roleBadge = roleLabelMap[persona.role];
-                  return (
-                    <button
-                      key={persona.id}
-                      onClick={() => {
-                        switchPersona(persona);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition ${
-                        isSelected ? 'bg-indigo-50/70' : ''
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                            isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {persona.avatarInitials}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
-                            <span>{persona.name}</span>
-                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
-                          </div>
-                          <div className="text-[11px] text-slate-500">{persona.designation}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{persona.email}</div>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border uppercase ${roleBadge.bg}`}>
-                        {roleBadge.label}
-                      </span>
-                    </button>
-                  );
-                })}
+              {/* Profile details */}
+              <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Department:</span>
+                  <strong className="text-slate-800">Human Resources (HR)</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Role:</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${currentRoleStyle.bg}`}>
+                    {currentRoleStyle.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Session:</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600 inline mr-0.5" />
+                    <span>Authenticated</span>
+                  </span>
+                </div>
               </div>
 
-              <div className="pt-2 px-3 border-t border-slate-100 flex items-center justify-between">
+              {/* Sign Out Button */}
+              <div className="pt-2 px-3 flex items-center justify-between">
+                <span className="text-[10px] text-slate-400">Renaissance HR</span>
                 <button
-                  onClick={loginWithGoogle}
-                  className="flex items-center space-x-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Google Sign-In</span>
-                </button>
-                <button
-                  onClick={logout}
-                  className="flex items-center space-x-1 text-xs text-slate-500 hover:text-red-600 font-medium px-2 py-1 rounded"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    logout();
+                  }}
+                  className="flex items-center space-x-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 font-semibold px-3 py-1.5 rounded-lg transition"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sign Out</span>
